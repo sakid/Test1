@@ -4,20 +4,43 @@ set -uo pipefail
 # Public-reference extraction only. This script never supplies credentials,
 # cookies, access tokens, MatterPak access, or private-model authentication.
 rm -rf work output
-mkdir -p work/logs output
+mkdir -p work/logs work/discovery output
 
 set +e
-xvfb-run -a python mp360/crawl_cyan_tours.py \
-  2>&1 | tee work/logs/discovery.log
-DISCOVERY_STATUS=${PIPESTATUS[0]}
+python mp360/crawl_cyan_fast.py \
+  2>&1 | tee work/logs/fast-discovery.log
+FAST_STATUS=${PIPESTATUS[0]}
 set -e
-echo "$DISCOVERY_STATUS" > work/logs/discovery.exit
+echo "$FAST_STATUS" > work/logs/fast-discovery.exit
+FAST_COUNT=0
+if [[ -s work/discovery/models.txt ]]; then
+  FAST_COUNT=$(grep -Ec '^[A-Za-z0-9_-]{11}$' work/discovery/models.txt || true)
+fi
+echo "Targeted resolver exit=$FAST_STATUS model_count=$FAST_COUNT"
 cat work/discovery/models.txt 2>/dev/null || true
 
+if [[ "$FAST_STATUS" -ne 0 || "$FAST_COUNT" -lt 7 ]]; then
+  echo "Targeted resolver was incomplete; starting broad multi-site fallback."
+  rm -rf work/discovery
+  mkdir -p work/discovery
+  set +e
+  xvfb-run -a python mp360/crawl_cyan_tours.py \
+    2>&1 | tee work/logs/broad-discovery.log
+  DISCOVERY_STATUS=${PIPESTATUS[0]}
+  set -e
+  echo "$DISCOVERY_STATUS" > work/logs/broad-discovery.exit
+else
+  DISCOVERY_STATUS=0
+fi
+
+cat work/discovery/models.txt 2>/dev/null || true
 if [[ ! -s work/discovery/models.txt ]]; then
   echo "No validated public Matterport model IDs were discovered."
   exit 2
 fi
+
+MODEL_COUNT=$(grep -Ec '^[A-Za-z0-9_-]{11}$' work/discovery/models.txt || true)
+echo "Validated public model count: $MODEL_COUNT"
 
 git clone --quiet --depth 1 \
   https://github.com/rebane2001/matterport-dl.git \
