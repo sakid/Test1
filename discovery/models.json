@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2026-08-07T07:52:07.156Z",
+  "candidateCount": 1,
+  "validModelCount": 1,
+  "models": [
+    {
+      "modelSid": "i1MqSM99sWw",
+      "sources": [
+        "known-fitness"
+      ],
+      "actions": [
+        "gallery:13"
+      ],
+      "contexts": [
+        "Fitness Center"
+      ],
+      "validationStatus": 200,
+      "validationUrl": "https://cdn-2.matterport.com/apifs/models/i1MqSM99sWw/images/AAxWw6DczLL/01.27.2020_17.46.34.jpg?t=2-5fce1bf926790e1b89f56bcb9946b22edacae805-1786179127-1&k=apifs%2Fmodels%2Fi1MqSM99sWw%2Fimages%2FAAxWw6DczLL%2F01.27.2020_17.46.34.jpg&width=1920&height=1080&fit=crop&disable=upscale",
+      "validationContentType": "image/jpeg",
+      "validPublicModel": true
+    }
+  ],
+  "validModels": [
+    {
+      "modelSid": "i1MqSM99sWw",
+      "sources": [
+        "known-fitness"
+      ],
+      "actions": [
+        "gallery:13"
+      ],
+      "contexts": [
+        "Fitness Center"
+      ],
+      "validationStatus": 200,
+      "validationUrl": "https://cdn-2.matterport.com/apifs/models/i1MqSM99sWw/images/AAxWw6DczLL/01.27.2020_17.46.34.jpg?t=2-5fce1bf926790e1b89f56bcb9946b22edacae805-1786179127-1&k=apifs%2Fmodels%2Fi1MqSM99sWw%2Fimages%2FAAxWw6DczLL%2F01.27.2020_17.46.34.jpg&width=1920&height=1080&fit=crop&disable=upscale",
+      "validationContentType": "image/jpeg",
+      "validPublicModel": true
+    }
+  ]
+}
