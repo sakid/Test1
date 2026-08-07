@@ -8,6 +8,13 @@ on:
       - mp360/**
       - .github/workflows/mp360-cyan-public-reference.yml
       - .github/mp360-trigger.txt
+  pull_request:
+    branches:
+      - master
+    paths:
+      - mp360/**
+      - .github/workflows/mp360-cyan-public-reference.yml
+      - .github/mp360-trigger.txt
   workflow_dispatch:
 
 permissions:
