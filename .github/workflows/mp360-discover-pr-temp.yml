@@ -1,17 +1,18 @@
-name: Temporary Cyan PDX fast ID resolver
+name: Temporary Cyan PDX tour-data HTTP probe
 
 on:
   pull_request:
     branches: [master]
     paths:
       - mp360-jina-relay.md
+      - mp360-http-probe.py
       - .github/workflows/mp360-discover-pr-temp.yml
 
 permissions:
   contents: write
 
 jobs:
-  discover:
+  probe:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -20,333 +21,38 @@ jobs:
         with:
           ref: mp360-cyan-id-discovery-20260807
 
-      - name: Install Playwright
+      - name: Probe server HTML and listing bundles
         shell: bash
         run: |
           set -euxo pipefail
-          npm init -y >/dev/null
-          npm install --no-audit --no-fund playwright@1.60.0
-          npx playwright install --with-deps chromium
-          rm -rf discovery
-          mkdir -p discovery
+          python -m pip install --upgrade pip
+          python -m pip install requests curl_cffi
+          rm -rf discovery/http-probe
+          python mp360-http-probe.py 2>&1 | tee discovery/http-probe-run.log
+          cat discovery/http-probe/summary.json
 
-      - name: Resolve all seven Matterport IDs from the tour cards
-        id: resolve
-        continue-on-error: true
-        shell: bash
-        run: |
-          cat > discover-fast.mjs <<'NODE'
-          import { chromium } from 'playwright';
-          import { writeFile } from 'node:fs/promises';
-
-          const url = 'https://www.apartments.com/cyan-pdx-portland-or/hjsnmt2/';
-          const knownFitness = 'i1MqSM99sWw';
-          const records = new Map();
-          const pending = new Set();
-          let action = 'startup';
-
-          function add(id, source, context = '') {
-            id = String(id || '').trim();
-            if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return;
-            const entry = records.get(id) || { modelSid: id, sources: [], actions: [], contexts: [] };
-            source = String(source).slice(0, 500);
-            context = String(context).replace(/\s+/g, ' ').slice(0, 1500);
-            if (source && !entry.sources.includes(source)) entry.sources.push(source);
-            if (action && !entry.actions.includes(action)) entry.actions.push(action.slice(0, 600));
-            if (context && !entry.contexts.includes(context)) entry.contexts.push(context);
-            entry.sources = entry.sources.slice(0, 50);
-            entry.actions = entry.actions.slice(0, 50);
-            entry.contexts = entry.contexts.slice(0, 25);
-            records.set(id, entry);
-            console.log(`MODEL_SID=${id} ACTION=${action} SOURCE=${source}`);
-          }
-
-          function scanOnce(text, source) {
-            text = String(text || '');
-            const patterns = [
-              /(?:my\.)?matterport\.com\/(?:show|discover)\/?\?[^\s"'<>]{0,1800}?[?&]m=([A-Za-z0-9_-]{11})/ig,
-              /my\.matterport\.com\/api\/v1\/player\/models\/([A-Za-z0-9_-]{11})/ig,
-              /my\.matterport\.com\/(?:models|spaces)\/([A-Za-z0-9_-]{11})/ig,
-              /\/services\/3d-tours\/[A-Za-z0-9_-]+\/([A-Za-z0-9_-]{11})(?:[/?#"' ]|$)/ig,
-              /["'](?:modelSid|modelId|matterportModelId|matterportId|matterport_id|spaceSid|spaceId|tourId)["']\s*[:=]\s*["']([A-Za-z0-9_-]{11})["']/ig
-            ];
-            for (const pattern of patterns) {
-              for (const match of text.matchAll(pattern)) {
-                const at = match.index || 0;
-                add(match[1], source, text.slice(Math.max(0, at - 350), at + match[0].length + 600));
-              }
-            }
-            try {
-              const parsed = new URL(text);
-              if (parsed.hostname.endsWith('matterport.com')) add(parsed.searchParams.get('m'), source, text);
-            } catch {}
-          }
-
-          function scan(value, source) {
-            let text = String(value || '');
-            const variants = [text];
-            text = text.replaceAll('\\u0026', '&').replaceAll('\\/', '/').replaceAll('&amp;', '&');
-            variants.push(text);
-            for (let i = 0; i < 4; i++) {
-              try {
-                const decoded = decodeURIComponent(text);
-                if (decoded === text) break;
-                text = decoded;
-                variants.push(text);
-              } catch { break; }
-            }
-            variants.forEach((variant, index) => scanOnce(variant, `${source}:v${index}`));
-          }
-
-          function monitor(page, label) {
-            page.on('request', request => scan(request.url(), `${label}:request`));
-            page.on('framenavigated', frame => scan(frame.url(), `${label}:frame`));
-            page.on('response', response => {
-              const task = (async () => {
-                scan(response.url(), `${label}:response-url`);
-                try {
-                  const headers = response.headers();
-                  const type = headers['content-type'] || '';
-                  const length = Number(headers['content-length'] || 0);
-                  if (!/(json|javascript|html|text|xml)/i.test(type) || length > 30000000) return;
-                  const body = await response.text();
-                  scan(body.slice(0, 30000000), `${label}:response-body:${response.url()}`);
-                } catch {}
-              })().finally(() => pending.delete(task));
-              pending.add(task);
-            });
-          }
-
-          async function settle(ms = 2500) {
-            await new Promise(resolve => setTimeout(resolve, ms));
-            if (pending.size) await Promise.allSettled([...pending]);
-          }
-
-          async function collect(page, label) {
-            scan(page.url(), `${label}:page-url`);
-            for (const frame of page.frames()) {
-              scan(frame.url(), `${label}:frame-url`);
-              try {
-                const values = await frame.evaluate(() => {
-                  const out = [document.documentElement?.outerHTML || '', location.href];
-                  for (const resource of performance.getEntriesByType('resource')) out.push(resource.name || '');
-                  for (const element of document.querySelectorAll(
-                    'iframe,a,button,img,[src],[href],[data-src],[data-url],[data-href],[data-tour],[data-tour-id],[data-model],[data-model-id],[onclick],[aria-label],[title]'
-                  )) out.push(element.outerHTML || '');
-                  return out.slice(0, 35000);
-                });
-                for (const value of values) scan(value, `${label}:dom`);
-              } catch {}
-            }
-          }
-
-          async function clickAndCollect(locator, page, nextAction) {
-            action = nextAction;
-            try { await locator.scrollIntoViewIfNeeded({ timeout: 2000 }); } catch {}
-            try { await locator.click({ timeout: 4500, force: true, noWaitAfter: true }); }
-            catch {
-              try { await locator.evaluate(element => element.click()); }
-              catch { return false; }
-            }
-            await settle(3500);
-            for (const openPage of page.context().pages()) await collect(openPage, nextAction);
-            return true;
-          }
-
-          async function closeOverlay(page) {
-            try { await page.keyboard.press('Escape'); await settle(350); } catch {}
-            for (const pattern of [/close dialog/i, /close gallery/i, /^close$/i]) {
-              try {
-                const controls = page.getByRole('button', { name: pattern });
-                const count = Math.min(await controls.count(), 8);
-                for (let index = 0; index < count; index++) {
-                  const control = controls.nth(index);
-                  if (await control.isVisible()) await control.click({ timeout: 1000, force: true }).catch(() => {});
-                }
-              } catch {}
-            }
-          }
-
-          const browser = await chromium.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled']
-          });
-          const context = await browser.newContext({
-            viewport: { width: 1600, height: 1350 },
-            locale: 'en-US',
-            timezoneId: 'America/Los_Angeles',
-            userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
-          });
-          context.on('page', page => monitor(page, 'popup'));
-          const page = await context.newPage();
-          monitor(page, 'apartments');
-          action = 'navigate';
-          await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 });
-          await settle(6500);
-
-          for (const pattern of [/accept all/i, /^accept$/i, /agree/i, /allow all/i, /got it/i]) {
-            try {
-              const controls = page.getByRole('button', { name: pattern });
-              for (let index = 0; index < Math.min(await controls.count(), 8); index++) {
-                const control = controls.nth(index);
-                if (await control.isVisible()) await control.click({ timeout: 1000, force: true }).catch(() => {});
-              }
-            } catch {}
-          }
-
-          const height = Math.min(await page.evaluate(() => Math.max(document.body?.scrollHeight || 0, document.documentElement?.scrollHeight || 0)), 70000);
-          for (let y = 0; y < height; y += 650) {
-            await page.evaluate(position => window.scrollTo(0, position), y);
-            await page.waitForTimeout(55);
-          }
-          await page.evaluate(() => window.scrollTo(0, 0));
-          await collect(page, 'initial');
-
-          try {
-            const controls = page.getByRole('button', { name: /show unavailable floor plans/i });
-            for (let index = 0; index < Math.min(await controls.count(), 12); index++) {
-              const control = controls.nth(index);
-              if (await control.isVisible()) await clickAndCollect(control, page, `show-unavailable:${index}`);
-            }
-          } catch {}
-
-          const tourImages = page.locator('img[alt*="Matterport 3D Tour" i]');
-          const tourCount = Math.min(await tourImages.count(), 30);
-          console.log(`MATTERPORT_CARD_COUNT=${tourCount}`);
-          for (let index = 0; index < tourCount && records.size < 7; index++) {
-            let target = tourImages.nth(index);
-            if (!(await target.isVisible())) continue;
-            const label = await target.evaluate(element => {
-              let parent = element;
-              for (let depth = 0; depth < 14 && parent; depth++, parent = parent.parentElement) {
-                const text = (parent.innerText || '').replace(/\s+/g, ' ').slice(0, 1500);
-                const match = text.match(/Studio \(AS2\)|One Bedroom \(A5\)|Large One Bedroom Townhome \(AT2\)|Two Bedroom, One Bath \(B1\)|Two Bedroom, Two Bath \(B3\)|Three Bedroom \(C1\)|Fitness Center/i);
-                if (match) return match[0];
-              }
-              return 'unknown';
-            }).catch(() => 'unknown');
-            const ancestor = target.locator('xpath=ancestor::button[1] | ancestor::a[1] | ancestor::*[@role="button"][1]');
-            if (await ancestor.count()) target = ancestor.first();
-            await clickAndCollect(target, page, `card:${index}:${label}`);
-            await closeOverlay(page);
-          }
-
-          if (records.size < 7) {
-            for (const pattern of [/7 virtual tours/i, /matterport 3d tours/i, /virtual tours/i]) {
-              try {
-                const controls = page.getByRole('button', { name: pattern });
-                for (let index = 0; index < Math.min(await controls.count(), 8); index++) {
-                  const control = controls.nth(index);
-                  if (await control.isVisible()) {
-                    await clickAndCollect(control, page, `open-gallery:${pattern}:${index}`);
-                    break;
-                  }
-                }
-              } catch {}
-              if (records.size >= 7) break;
-            }
-          }
-
-          for (let step = 0; step < 14 && records.size < 7; step++) {
-            action = `gallery:${step}`;
-            for (const openPage of context.pages()) await collect(openPage, action);
-            let advanced = false;
-            for (const pattern of [/next image/i, /carousel next/i, /^next$/i, /right/i, /forward/i]) {
-              try {
-                const controls = page.getByRole('button', { name: pattern });
-                for (let index = 0; index < Math.min(await controls.count(), 8); index++) {
-                  const control = controls.nth(index);
-                  if (await control.isVisible()) {
-                    advanced = await clickAndCollect(control, page, `gallery:${step}:${pattern}:${index}`);
-                    if (advanced) break;
-                  }
-                }
-              } catch {}
-              if (advanced) break;
-            }
-            if (!advanced) {
-              await page.keyboard.press('ArrowRight').catch(() => {});
-              await settle(1800);
-            }
-          }
-
-          await settle(2500);
-          await collect(page, 'final');
-          add(knownFitness, 'known-fitness', 'Fitness Center');
-          await context.close();
-          await browser.close();
-
-          const valid = [];
-          for (const entry of records.values()) {
-            try {
-              const response = await fetch(`https://my.matterport.com/api/v1/player/models/${entry.modelSid}/thumb`, {
-                redirect: 'follow', headers: { 'user-agent': 'Mozilla/5.0' }
-              });
-              const type = response.headers.get('content-type') || '';
-              const data = await response.arrayBuffer();
-              entry.validationStatus = response.status;
-              entry.validationUrl = response.url;
-              entry.validationContentType = type;
-              entry.validPublicModel = response.ok && (type.toLowerCase().includes('image') || data.byteLength > 2000);
-            } catch (error) {
-              entry.validPublicModel = false;
-              entry.validationError = String(error);
-            }
-            if (entry.validPublicModel) valid.push(entry);
-          }
-
-          const result = {
-            generatedAt: new Date().toISOString(),
-            candidateCount: records.size,
-            validModelCount: valid.length,
-            models: [...records.values()].sort((a, b) => a.modelSid.localeCompare(b.modelSid)),
-            validModels: valid.sort((a, b) => a.modelSid.localeCompare(b.modelSid))
-          };
-          await writeFile('discovery/models.json', JSON.stringify(result, null, 2) + '\n');
-          await writeFile('discovery/models.txt', result.validModels.map(item => item.modelSid).join('\n') + '\n');
-          console.log('DISCOVERY_RESULT=' + JSON.stringify(result));
-          console.log(`VALID_MODEL_COUNT=${valid.length}`);
-          NODE
-          set -uo pipefail
-          set +e
-          node discover-fast.mjs 2>&1 | tee discovery/run.log
-          STATUS=${PIPESTATUS[0]}
-          set -e
-          echo "$STATUS" > discovery/exit.txt
-          cat discovery/models.txt || true
-          cat discovery/models.json || true
-
-      - name: Commit discovery result to temporary branch
+      - name: Commit HTTP-probe evidence to temporary branch
         if: always()
         shell: bash
         run: |
           set -euxo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f discovery || true
+          git add -f discovery/http-probe discovery/http-probe-run.log || true
           if git diff --cached --quiet; then
-            echo "No discovery files to commit."
+            echo "No HTTP probe files to commit."
           else
-            git commit -m "Save Cyan Matterport ID discovery result"
+            git commit -m "Save Cyan tour-data HTTP probe"
             git push origin HEAD:mp360-cyan-id-discovery-20260807
           fi
 
-      - name: Upload discovery evidence
+      - name: Upload HTTP-probe evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cyan-pdx-fast-id-discovery-${{ github.run_id }}
-          path: discovery
+          name: cyan-pdx-tour-data-http-probe-${{ github.run_id }}
+          path: |
+            discovery/http-probe/**
+            discovery/http-probe-run.log
           if-no-files-found: warn
           retention-days: 1
-
-      - name: Require seven public models
-        shell: bash
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          data = json.loads(Path('discovery/models.json').read_text())
-          if data.get('validModelCount', 0) < 7:
-              raise SystemExit(f"Expected seven models; found {data.get('validModelCount', 0)}")
-          PY
