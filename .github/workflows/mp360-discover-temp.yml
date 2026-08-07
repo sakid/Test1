@@ -1,0 +1,376 @@
+name: Temporary Cyan PDX Matterport discovery
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/mp360-discover-temp.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out scratch repository
+        uses: actions/checkout@v4
+
+      - name: Install Playwright
+        shell: bash
+        run: |
+          set -euxo pipefail
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.60.0
+          npx playwright install --with-deps chromium
+          mkdir -p discovery
+
+      - name: Resolve Cyan public Matterport IDs
+        shell: bash
+        run: |
+          cat > discover.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          import { mkdir, writeFile } from 'node:fs/promises';
+
+          const sources = [
+            'https://www.apartments.com/cyan-pdx-portland-or/hjsnmt2/',
+            'https://www.forrent.com/or/portland/cyan-pdx/5jsnltp',
+            'https://www.greystar.com/cyan-pdx-apartments-portland-or/p_12248',
+            'https://www.homes.com/property/cyan-pdx-portland-or/8f8z1fck4mtk9/'
+          ];
+          const plans = [
+            ['Studio (AS2)', 'studio-as2'],
+            ['One Bedroom (A5)', 'one-bedroom-a5'],
+            ['Large One Bedroom Townhome (AT2)', 'townhome-at2'],
+            ['Two Bedroom, One Bath (B1)', 'two-bedroom-b1'],
+            ['Two Bedroom, Two Bath (B3)', 'two-bedroom-b3'],
+            ['Three Bedroom (C1)', 'three-bedroom-c1']
+          ];
+          const knownFitness = 'i1MqSM99sWw';
+          const records = new Map();
+          const network = [];
+          const pending = new Set();
+          let action = 'initial';
+
+          await mkdir('discovery', { recursive: true });
+
+          function add(id, source, context = '', explicitAction = action) {
+            id = String(id || '').trim();
+            if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return;
+            const entry = records.get(id) || { modelSid: id, sources: [], actions: [], contexts: [] };
+            source = String(source).slice(0, 700);
+            context = String(context).replace(/\s+/g, ' ').slice(0, 4000);
+            explicitAction = String(explicitAction || '').slice(0, 600);
+            if (source && !entry.sources.includes(source)) entry.sources.push(source);
+            if (explicitAction && !entry.actions.includes(explicitAction)) entry.actions.push(explicitAction);
+            if (context && !entry.contexts.includes(context)) entry.contexts.push(context);
+            entry.sources = entry.sources.slice(0, 60);
+            entry.actions = entry.actions.slice(0, 50);
+            entry.contexts = entry.contexts.slice(0, 30);
+            records.set(id, entry);
+            console.log(`MODEL_SID=${id} ACTION=${explicitAction} SOURCE=${source}`);
+          }
+
+          function scanOnce(text, source) {
+            text = String(text || '');
+            const patterns = [
+              /(?:my\.)?matterport\.com\/(?:show|models|discover)\/?[^\s"'<>]{0,2000}?[?&]m=([A-Za-z0-9_-]{11})/ig,
+              /(?:my\.)?matterport\.com\/models\/([A-Za-z0-9_-]{11})/ig,
+              /my\.matterport\.com\/api\/v1\/player\/models\/([A-Za-z0-9_-]{11})/ig,
+              /\/services\/3d-tours\/[A-Za-z0-9_-]+\/([A-Za-z0-9_-]{11})(?:[/?#"' ]|$)/ig,
+              /["'](?:modelSid|modelId|matterportModelId|matterportId|spaceSid|spaceId|tourId)["']\s*[:=]\s*["']([A-Za-z0-9_-]{11})["']/ig,
+              /(?:modelSid|matterportModelId|matterportId|spaceSid)(?:%22|\\?["'])?\s*(?::|%3A|=)\s*(?:%22|\\?["'])?([A-Za-z0-9_-]{11})/ig
+            ];
+            for (const pattern of patterns) {
+              for (const match of text.matchAll(pattern)) {
+                const at = match.index || 0;
+                add(match[1], source, text.slice(Math.max(0, at - 350), at + match[0].length + 700));
+              }
+            }
+          }
+
+          function scan(value, source) {
+            let text = String(value || '');
+            const variants = [text];
+            text = text.replaceAll('\\u0026', '&').replaceAll('\\/', '/').replaceAll('&amp;', '&');
+            variants.push(text);
+            for (let i = 0; i < 3; i++) {
+              try {
+                const next = decodeURIComponent(text);
+                if (next === text) break;
+                text = next;
+                variants.push(text);
+              } catch { break; }
+            }
+            for (const variant of variants) scanOnce(variant, source);
+          }
+
+          function scanJson(value, source, path = '$') {
+            if (Array.isArray(value)) {
+              value.forEach((child, index) => scanJson(child, source, `${path}[${index}]`));
+            } else if (value && typeof value === 'object') {
+              for (const [key, child] of Object.entries(value)) {
+                const childPath = `${path}.${key}`;
+                if (typeof child === 'string') {
+                  scan(child, `${source}:${childPath}`);
+                  if (/matterport|model.*sid|space.*sid|tour.*id|tour.*url/i.test(key) && /^[A-Za-z0-9_-]{11}$/.test(child)) {
+                    add(child, `${source}:${childPath}`, JSON.stringify(value).slice(0, 3500));
+                  }
+                } else scanJson(child, source, childPath);
+              }
+            } else if (typeof value === 'string') scan(value, `${source}:${path}`);
+          }
+
+          function monitor(page, label) {
+            page.on('request', request => scan(request.url(), `${label}:request`));
+            page.on('framenavigated', frame => scan(frame.url(), `${label}:frame`));
+            page.on('response', response => {
+              const task = (async () => {
+                scan(response.url(), `${label}:response-url`);
+                try {
+                  const headers = response.headers();
+                  const type = headers['content-type'] || '';
+                  const length = Number(headers['content-length'] || 0);
+                  network.push({ url: response.url(), status: response.status(), contentType: type, contentLength: length, action });
+                  if (!/(json|javascript|html|text|xml)/i.test(type) || length > 30000000) return;
+                  const body = await response.text();
+                  if (body.length > 30000000) return;
+                  scan(body, `${label}:response-body:${response.url()}`);
+                  if (/json/i.test(type)) {
+                    try { scanJson(JSON.parse(body), `${label}:json:${response.url()}`); } catch {}
+                  }
+                } catch {}
+              })().finally(() => pending.delete(task));
+              pending.add(task);
+            });
+          }
+
+          async function settle(ms = 2500) {
+            await new Promise(resolve => setTimeout(resolve, ms));
+            if (pending.size) await Promise.allSettled([...pending]);
+          }
+
+          async function collect(page, label) {
+            scan(page.url(), `${label}:page-url`);
+            for (const frame of page.frames()) {
+              scan(frame.url(), `${label}:frame-url`);
+              try {
+                const values = await frame.evaluate(() => {
+                  const out = [];
+                  const seen = new Set();
+                  function walk(root, prefix) {
+                    if (!root || seen.has(root)) return;
+                    seen.add(root);
+                    const nodes = root.querySelectorAll ? root.querySelectorAll('*') : [];
+                    for (const el of nodes) {
+                      const value = [
+                        el.tagName, el.id, typeof el.className === 'string' ? el.className : '',
+                        el.getAttribute?.('href'), el.getAttribute?.('src'), el.getAttribute?.('data-src'),
+                        el.getAttribute?.('data-url'), el.getAttribute?.('data-tour'), el.getAttribute?.('data-tour-id'),
+                        el.getAttribute?.('data-model'), el.getAttribute?.('data-model-id'),
+                        el.getAttribute?.('aria-label'), el.getAttribute?.('title'), el.textContent?.slice(0, 1600)
+                      ].filter(Boolean).join(' | ');
+                      if (/matterport|virtual.?tour|3d.?tour|AS2|A5|AT2|B1|B3|C1|services\/3d-tours/i.test(value)) out.push(prefix + ' ' + value);
+                      if (el.shadowRoot) walk(el.shadowRoot, prefix + '>>' + el.tagName);
+                    }
+                  }
+                  walk(document, 'document');
+                  out.push('HTML ' + document.documentElement.outerHTML);
+                  for (const item of performance.getEntriesByType('resource')) out.push('RESOURCE ' + item.name);
+                  for (const script of document.scripts) {
+                    if (script.src) out.push('SCRIPT-SRC ' + script.src);
+                    if (script.textContent) out.push('SCRIPT-TEXT ' + script.textContent);
+                  }
+                  try { out.push('LOCALSTORAGE ' + JSON.stringify(localStorage)); } catch {}
+                  try { out.push('SESSIONSTORAGE ' + JSON.stringify(sessionStorage)); } catch {}
+                  return out.slice(0, 50000);
+                });
+                for (const value of values) scan(value, `${label}:dom`);
+              } catch {}
+            }
+          }
+
+          async function clickAndCollect(locator, page, context, nextAction) {
+            action = nextAction;
+            try { await locator.scrollIntoViewIfNeeded({ timeout: 2000 }); } catch {}
+            try { await locator.click({ timeout: 5000, force: true, noWaitAfter: true }); }
+            catch {
+              try { await locator.evaluate(el => el.click()); }
+              catch { return false; }
+            }
+            await settle(3500);
+            for (const openPage of context.pages()) await collect(openPage, `after:${nextAction}`);
+            return true;
+          }
+
+          async function exerciseApartments(page, context) {
+            for (const pattern of [/show unavailable floor plans/i, /7 virtual tours/i, /virtual tours/i]) {
+              try {
+                for (const [index, item] of (await page.getByRole('button', { name: pattern }).all()).slice(0, 12).entries()) {
+                  if (await item.isVisible()) await clickAndCollect(item, page, context, `reveal:${pattern}:${index}`);
+                }
+              } catch {}
+            }
+
+            for (const [display, slug] of plans) {
+              action = `plan:${slug}`;
+              try {
+                const clicked = await page.evaluate(({ display }) => {
+                  const targets = [...document.querySelectorAll(
+                    'img[alt*="Matterport" i],img[src*="matterport" i],[aria-label*="Matterport" i],[aria-label*="Virtual Tour" i],a[href*="/services/3d-tours/"]'
+                  )];
+                  for (const target of targets) {
+                    let parent = target;
+                    for (let depth = 0; depth < 12 && parent; depth++, parent = parent.parentElement) {
+                      if ((parent.innerText || '').includes(display)) {
+                        (target.closest('button,a,[role="button"]') || target).click();
+                        return true;
+                      }
+                    }
+                  }
+                  return false;
+                }, { display });
+                if (clicked) {
+                  await settle(4000);
+                  for (const openPage of context.pages()) await collect(openPage, `after-plan:${slug}`);
+                  try { await page.keyboard.press('Escape'); } catch {}
+                }
+              } catch {}
+            }
+
+            const selectors = [
+              'img[alt*="Matterport" i]', 'img[src*="matterport" i]',
+              '[aria-label*="Matterport" i]', '[aria-label*="Virtual Tour" i]',
+              'a[href*="/services/3d-tours/"]'
+            ];
+            let sequence = 0;
+            for (const selector of selectors) {
+              const locator = page.locator(selector);
+              const count = Math.min(await locator.count().catch(() => 0), 100);
+              for (let index = 0; index < count; index++) {
+                const item = locator.nth(index);
+                try {
+                  if (!(await item.isVisible())) continue;
+                  const label = await item.evaluate(el => {
+                    let parent = el;
+                    for (let depth = 0; depth < 10 && parent; depth++, parent = parent.parentElement) {
+                      const text = (parent.innerText || '').replace(/\s+/g, ' ').slice(0, 700);
+                      if (/AS2|A5|AT2|B1|B3|C1|Studio|Bedroom|Townhome|Fitness/i.test(text)) return text;
+                    }
+                    return '';
+                  });
+                  await clickAndCollect(item, page, context, `all-matterport:${sequence++}:${label}`);
+                  try { await page.keyboard.press('Escape'); } catch {}
+                } catch {}
+              }
+            }
+
+            for (let step = 0; step < 20; step++) {
+              action = `gallery-step:${step}`;
+              for (const openPage of context.pages()) await collect(openPage, `gallery:${step}`);
+              let advanced = false;
+              for (const pattern of [/next image/i, /carousel next/i, /next/i, /right/i, /forward/i]) {
+                try {
+                  for (const button of (await page.getByRole('button', { name: pattern }).all()).slice(0, 8)) {
+                    if (await button.isVisible()) {
+                      advanced = await clickAndCollect(button, page, context, `gallery-next:${step}:${pattern}`);
+                      if (advanced) break;
+                    }
+                  }
+                  if (advanced) break;
+                } catch {}
+              }
+              if (!advanced) {
+                try { await page.keyboard.press('ArrowRight'); await settle(2200); } catch {}
+              }
+            }
+          }
+
+          const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled'] });
+          const context = await browser.newContext({
+            viewport: { width: 1600, height: 1400 }, locale: 'en-US', timezoneId: 'America/Los_Angeles',
+            userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+          });
+          context.on('page', page => monitor(page, 'popup'));
+          const reports = [];
+
+          for (let sourceIndex = 0; sourceIndex < sources.length; sourceIndex++) {
+            const url = sources[sourceIndex];
+            const page = await context.newPage();
+            monitor(page, `site-${sourceIndex + 1}`);
+            const report = { url, finalUrl: null, title: null, error: null };
+            try {
+              action = `navigate:${url}`;
+              await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 });
+              await settle(8000);
+              for (const pattern of [/accept/i, /allow all/i, /agree/i, /got it/i, /continue/i]) {
+                try {
+                  for (const button of (await page.getByRole('button', { name: pattern }).all()).slice(0, 10)) {
+                    try { if (await button.isVisible()) await button.click({ timeout: 1200 }); } catch {}
+                  }
+                } catch {}
+              }
+              try {
+                const height = Math.min(await page.evaluate(() => Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)), 60000);
+                for (let y = 0; y < height; y += 700) { await page.evaluate(y => scrollTo(0, y), y); await page.waitForTimeout(90); }
+                await page.evaluate(() => scrollTo(0, 0));
+              } catch {}
+              await settle(3500);
+              await collect(page, `site-${sourceIndex + 1}:initial`);
+              if (url.includes('apartments.com')) await exerciseApartments(page, context);
+              else {
+                const controls = page.locator('button,a,[role="button"],img[alt]');
+                const count = Math.min(await controls.count().catch(() => 0), 1800);
+                for (let index = 0; index < count; index++) {
+                  const item = controls.nth(index);
+                  let descriptor = '';
+                  try {
+                    descriptor = [await item.innerText({ timeout: 100 }), await item.getAttribute('aria-label'), await item.getAttribute('title'), await item.getAttribute('alt'), await item.getAttribute('href')].filter(Boolean).join(' ');
+                  } catch {}
+                  if (!/matterport|virtual.?tour|3d.?tour|AS2|A5|AT2|B1|B3|C1/i.test(descriptor)) continue;
+                  try { if (await item.isVisible()) await clickAndCollect(item, page, context, `generic:${index}:${descriptor.slice(0, 200)}`); } catch {}
+                  if (records.size >= 7) break;
+                }
+              }
+              await settle(4000);
+              await collect(page, `site-${sourceIndex + 1}:final`);
+              report.finalUrl = page.url();
+              report.title = await page.title();
+              await writeFile(`discovery/site-${sourceIndex + 1}.html`, await page.content()).catch(() => {});
+              await page.screenshot({ path: `discovery/site-${sourceIndex + 1}.png`, fullPage: true }).catch(() => {});
+            } catch (error) { report.error = String(error?.message || error).slice(0, 3000); }
+            reports.push(report);
+            await page.close().catch(() => {});
+            if (records.size >= 7) break;
+          }
+
+          await settle(3000);
+          await context.close();
+          await browser.close();
+          add(knownFitness, 'known-public-fitness-tour', 'Cyan PDX Fitness Center', 'known');
+          const result = {
+            generatedAt: new Date().toISOString(), sources: reports,
+            models: [...records.values()].sort((a, b) => a.modelSid.localeCompare(b.modelSid)),
+            modelCount: records.size, expectedTourCount: 7,
+            expectedPlans: plans.map(([display, label]) => ({ display, label }))
+          };
+          await writeFile('discovery/models.json', JSON.stringify(result, null, 2) + '\n');
+          await writeFile('discovery/models.txt', result.models.map(item => item.modelSid).join('\n') + '\n');
+          await writeFile('discovery/network.json', JSON.stringify(network, null, 2) + '\n');
+          console.log('DISCOVERY_RESULT=' + JSON.stringify(result));
+          console.log('DISCOVERED_MODEL_COUNT=' + records.size);
+          NODE
+          node discover.mjs 2>&1 | tee discovery/run.log
+          cat discovery/models.txt
+          jq '{modelCount, models: [.models[] | {modelSid, actions, sources}]}' discovery/models.json
+
+      - name: Upload discovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyan-pdx-matterport-discovery-${{ github.run_id }}
+          path: discovery
+          if-no-files-found: error
+          retention-days: 2
