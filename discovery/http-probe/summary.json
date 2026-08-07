@@ -1,0 +1,100 @@
+{
+  "reports": [
+    {
+      "name": "requests",
+      "status": 403,
+      "finalUrl": "https://www.apartments.com/cyan-pdx-portland-or/hjsnmt2/",
+      "contentType": "text/html",
+      "bytes": 419,
+      "title": "Access Denied",
+      "matterportCount": 0,
+      "virtualTourCount": 0,
+      "service3dCount": 0,
+      "sids": {},
+      "scriptUrls": []
+    },
+    {
+      "name": "curl-chrome",
+      "status": 200,
+      "finalUrl": "https://www.apartments.com/cyan-pdx-portland-or/hjsnmt2/",
+      "contentType": "text/html",
+      "bytes": 2492,
+      "title": null,
+      "matterportCount": 0,
+      "virtualTourCount": 0,
+      "service3dCount": 0,
+      "sids": {},
+      "scriptUrls": [
+        "https://www.apartments.com/avn8wzCU4iOup/pIadFf/Y43mrI3E/tXtYhLOh/DH1JBgQSaQo/KlduXXAI/VnN4?v=d7d4e085-c519-aad0-7cb4-edc31ef517cd&t=76593897"
+      ]
+    },
+    {
+      "name": "curl-chrome124",
+      "status": 403,
+      "finalUrl": "https://www.apartments.com/cyan-pdx-portland-or/hjsnmt2/",
+      "contentType": "text/html",
+      "bytes": 577,
+      "title": "Access Denied",
+      "matterportCount": 0,
+      "virtualTourCount": 0,
+      "service3dCount": 0,
+      "sids": {},
+      "scriptUrls": [
+        "https://www.apartments.com/avn8wzCU4iOup/pIadFf/Y43mrI3E/tXtYhLOh/DH1JBgQSaQo/KlduXXAI/VnN4?v=ac97d528-94cc-3ee9-b586-8c4118a017cd"
+      ]
+    },
+    {
+      "name": "curl-safari",
+      "status": 403,
+      "finalUrl": "https://www.apartments.com/cyan-pdx-portland-or/hjsnmt2/",
+      "contentType": "text/html",
+      "bytes": 577,
+      "title": "Access Denied",
+      "matterportCount": 0,
+      "virtualTourCount": 0,
+      "service3dCount": 0,
+      "sids": {},
+      "scriptUrls": [
+        "https://www.apartments.com/avn8wzCU4iOup/pIadFf/Y43mrI3E/tXtYhLOh/DH1JBgQSaQo/KlduXXAI/VnN4?v=e070af98-732c-08e1-da55-3e5e6cff17cd"
+      ]
+    },
+    {
+      "name": "jina-https",
+      "status": 200,
+      "finalUrl": "https://r.jina.ai/http://https://www.apartments.com/cyan-pdx-portland-or/hjsnmt2/",
+      "contentType": "text/plain; charset=utf-8",
+      "bytes": 374,
+      "title": null,
+      "matterportCount": 0,
+      "virtualTourCount": 0,
+      "service3dCount": 0,
+      "sids": {},
+      "scriptUrls": []
+    },
+    {
+      "name": "jina-http",
+      "status": 200,
+      "finalUrl": "https://r.jina.ai/http://www.apartments.com/cyan-pdx-portland-or/hjsnmt2/",
+      "contentType": "text/plain; charset=utf-8",
+      "bytes": 375,
+      "title": null,
+      "matterportCount": 0,
+      "virtualTourCount": 0,
+      "service3dCount": 0,
+      "sids": {},
+      "scriptUrls": []
+    }
+  ],
+  "best": "curl-chrome",
+  "scriptProbe": {
+    "scriptsWithKeywords": [
+      {
+        "url": "https://www.apartments.com/avn8wzCU4iOup/pIadFf/Y43mrI3E/tXtYhLOh/DH1JBgQSaQo/KlduXXAI/VnN4?v=d7d4e085-c519-aad0-7cb4-edc31ef517cd&t=76593897",
+        "status": 200,
+        "bytes": 526675,
+        "matches": []
+      }
+    ],
+    "candidateEndpoints": []
+  }
+}
