@@ -6,41 +6,29 @@ set -uo pipefail
 rm -rf work output
 mkdir -p work/logs work/discovery output
 
-set +e
-python mp360/crawl_cyan_fast.py \
-  2>&1 | tee work/logs/fast-discovery.log
-FAST_STATUS=${PIPESTATUS[0]}
-set -e
-echo "$FAST_STATUS" > work/logs/fast-discovery.exit
-FAST_COUNT=0
-if [[ -s work/discovery/models.txt ]]; then
-  FAST_COUNT=$(grep -Ec '^[A-Za-z0-9_-]{11}$' work/discovery/models.txt || true)
-fi
-echo "Targeted resolver exit=$FAST_STATUS model_count=$FAST_COUNT"
-cat work/discovery/models.txt 2>/dev/null || true
+cp mp360/cyan-models.json work/discovery/models.json
+python - <<'PY'
+import json
+from pathlib import Path
 
-if [[ "$FAST_STATUS" -ne 0 || "$FAST_COUNT" -lt 7 ]]; then
-  echo "Targeted resolver was incomplete; starting broad multi-site fallback."
-  rm -rf work/discovery
-  mkdir -p work/discovery
-  set +e
-  xvfb-run -a python mp360/crawl_cyan_tours.py \
-    2>&1 | tee work/logs/broad-discovery.log
-  DISCOVERY_STATUS=${PIPESTATUS[0]}
-  set -e
-  echo "$DISCOVERY_STATUS" > work/logs/broad-discovery.exit
-else
-  DISCOVERY_STATUS=0
-fi
+data = json.loads(Path('work/discovery/models.json').read_text())
+models = [item['modelSid'] for item in data['models']]
+if len(models) != 7 or len(set(models)) != 7:
+    raise SystemExit(f'Expected seven distinct Cyan models, got {models}')
+Path('work/discovery/models.txt').write_text('\n'.join(models) + '\n')
+print(json.dumps({
+    'resolvedModels': [
+        {
+            'modelSid': item['modelSid'],
+            'label': item.get('label'),
+            'contexts': item.get('contexts', []),
+        }
+        for item in data['models']
+    ]
+}, indent=2))
+PY
 
-cat work/discovery/models.txt 2>/dev/null || true
-if [[ ! -s work/discovery/models.txt ]]; then
-  echo "No validated public Matterport model IDs were discovered."
-  exit 2
-fi
-
-MODEL_COUNT=$(grep -Ec '^[A-Za-z0-9_-]{11}$' work/discovery/models.txt || true)
-echo "Validated public model count: $MODEL_COUNT"
+cat work/discovery/models.txt
 
 git clone --quiet --depth 1 \
   https://github.com/rebane2001/matterport-dl.git \
