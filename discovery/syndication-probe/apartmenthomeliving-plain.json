@@ -1,0 +1,18 @@
+{
+  "source": "apartmenthomeliving",
+  "method": "plain",
+  "requestedUrl": "https://www.apartmenthomeliving.com/apartment-finder/Cyan-PDX-Portland-OR-97201-1917738",
+  "status": 403,
+  "responseUrl": "https://www.apartmenthomeliving.com/apartment-finder/Cyan-PDX-Portland-OR-97201-1917738",
+  "contentType": "text/html",
+  "bytes": 460,
+  "title": "Access Denied",
+  "matterportCount": 0,
+  "virtualTourCount": 0,
+  "service3dCount": 0,
+  "sids": {},
+  "iframes": [],
+  "relevantLinks": [],
+  "scriptUrls": [],
+  "snippets": []
+}

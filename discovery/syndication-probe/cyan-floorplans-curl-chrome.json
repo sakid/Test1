@@ -1,0 +1,18 @@
+{
+  "source": "cyan-floorplans",
+  "method": "curl-chrome",
+  "requestedUrl": "https://www.cyanpdx.com/floorplans",
+  "status": 403,
+  "responseUrl": "https://www.cyanpdx.com/floorplans",
+  "contentType": "text/html; charset=UTF-8",
+  "bytes": 5990,
+  "title": "Just a moment...",
+  "matterportCount": 0,
+  "virtualTourCount": 0,
+  "service3dCount": 0,
+  "sids": {},
+  "iframes": [],
+  "relevantLinks": [],
+  "scriptUrls": [],
+  "snippets": []
+}

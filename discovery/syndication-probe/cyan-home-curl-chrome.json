@@ -1,0 +1,18 @@
+{
+  "source": "cyan-home",
+  "method": "curl-chrome",
+  "requestedUrl": "https://www.cyanpdx.com/",
+  "status": 403,
+  "responseUrl": "https://www.cyanpdx.com/",
+  "contentType": "text/html; charset=UTF-8",
+  "bytes": 5939,
+  "title": "Just a moment...",
+  "matterportCount": 0,
+  "virtualTourCount": 0,
+  "service3dCount": 0,
+  "sids": {},
+  "iframes": [],
+  "relevantLinks": [],
+  "scriptUrls": [],
+  "snippets": []
+}

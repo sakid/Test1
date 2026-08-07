@@ -1,0 +1,61 @@
+{
+  "scriptsProbed": 28,
+  "scriptsWithRelevantContent": [
+    {
+      "url": "https://www.greystar.com/pdp/_next/static/chunks/3rczmq20mynpo.js?dpl=dpl_AgMEBhCv6r5NcQWgamhSbqe4Cwj5",
+      "status": 200,
+      "bytes": 230613,
+      "sids": {}
+    },
+    {
+      "url": "https://www.greystar.com/pdp/_next/static/chunks/0z4y2wamdmyyz.js?dpl=dpl_AgMEBhCv6r5NcQWgamhSbqe4Cwj5",
+      "status": 200,
+      "bytes": 31525,
+      "sids": {}
+    },
+    {
+      "url": "https://www.greystar.com/pdp/_next/static/chunks/14opqshn1lysz.js?dpl=dpl_AgMEBhCv6r5NcQWgamhSbqe4Cwj5",
+      "status": 200,
+      "bytes": 2457965,
+      "sids": {}
+    },
+    {
+      "url": "https://www.greystar.com/pdp/_next/static/chunks/0u9b6gcula-d0.js?dpl=dpl_AgMEBhCv6r5NcQWgamhSbqe4Cwj5",
+      "status": 200,
+      "bytes": 2457965,
+      "sids": {}
+    },
+    {
+      "url": "https://www.greystar.com/pdp/_next/static/chunks/0cz1d0mv5g_q7.js?dpl=dpl_AgMEBhCv6r5NcQWgamhSbqe4Cwj5",
+      "status": 200,
+      "bytes": 112594,
+      "sids": {}
+    },
+    {
+      "url": "https://www.corporatehousing.com/or/portland/cyan-pdx/main-QMRCXUHP.js",
+      "status": 200,
+      "bytes": 167577,
+      "sids": {}
+    },
+    {
+      "url": "https://image.apartmenthomeliving.com/assets/ldp_manifest_desktop_js-c86ae3925945d90e9c42261d70b70ba0dd40ce1ecc8ec192cd15e2cba6d37c90.js",
+      "status": 200,
+      "bytes": 621196,
+      "sids": {}
+    },
+    {
+      "url": "https://www.homes.com/6quM/WSR0/9F/6Kgj/VUgA/pLaYcD9V5O/Y2NaNg/c3/NOX242VX54?v=81d32288-7282-0841-0d50-ec6e22391724&t=292300201",
+      "status": 200,
+      "bytes": 526675,
+      "sids": {}
+    },
+    {
+      "url": "https://www.forrent.com/CDQO3F/I/i/1OLWyorFOA/Dzw5XJOO/T3xxAQ/HExpI/wI-EHh4?v=eb879077-6078-1ff4-ae1d-fa86ebf717d6",
+      "status": 200,
+      "bytes": 526675,
+      "sids": {}
+    }
+  ],
+  "discoveredSids": {},
+  "candidateEndpoints": []
+}

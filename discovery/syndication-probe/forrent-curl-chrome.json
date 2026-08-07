@@ -1,0 +1,20 @@
+{
+  "source": "forrent",
+  "method": "curl-chrome",
+  "requestedUrl": "https://www.forrent.com/or/portland/cyan-pdx/5jsnltp",
+  "status": 403,
+  "responseUrl": "https://www.forrent.com/or/portland/cyan-pdx/5jsnltp",
+  "contentType": "text/html",
+  "bytes": 558,
+  "title": "Access Denied",
+  "matterportCount": 0,
+  "virtualTourCount": 0,
+  "service3dCount": 0,
+  "sids": {},
+  "iframes": [],
+  "relevantLinks": [],
+  "scriptUrls": [
+    "https://www.forrent.com/CDQO3F/I/i/1OLWyorFOA/Dzw5XJOO/T3xxAQ/HExpI/wI-EHh4?v=eb879077-6078-1ff4-ae1d-fa86ebf717d6"
+  ],
+  "snippets": []
+}

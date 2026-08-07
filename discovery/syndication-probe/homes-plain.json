@@ -1,0 +1,18 @@
+{
+  "source": "homes",
+  "method": "plain",
+  "requestedUrl": "https://www.homes.com/property/cyan-pdx-portland-or/8f8z1fck4mtk9/",
+  "status": 403,
+  "responseUrl": "https://www.homes.com/property/cyan-pdx-portland-or/8f8z1fck4mtk9/",
+  "contentType": "text/html",
+  "bytes": 435,
+  "title": "Access Denied",
+  "matterportCount": 0,
+  "virtualTourCount": 0,
+  "service3dCount": 0,
+  "sids": {},
+  "iframes": [],
+  "relevantLinks": [],
+  "scriptUrls": [],
+  "snippets": []
+}
