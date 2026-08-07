@@ -1,0 +1,73 @@
+{
+  "generatedAt": "2026-08-07T08:00:00Z",
+  "source": "ApartmentHomeLiving syndicated Cyan/PDX tour records",
+  "expectedTourCount": 7,
+  "models": [
+    {
+      "modelSid": "i1MqSM99sWw",
+      "label": "Fitness-Center",
+      "actions": ["known:Fitness Center"],
+      "contexts": ["Fitness Center"],
+      "sources": ["previously validated public Cyan Matterport tour"],
+      "validPublicModel": true
+    },
+    {
+      "modelSid": "keZVKW8FS8u",
+      "label": "Studio-AS2",
+      "actions": ["plan:Studio (AS2)"],
+      "contexts": ["Studio, 1BA - 538 SF", "Studio (AS2) - 3D Tour"],
+      "sources": ["ApartmentHomeLiving Cyan/PDX syndicated tourImages"],
+      "validPublicModel": true
+    },
+    {
+      "modelSid": "tbsF2zv6xxs",
+      "label": "One-Bedroom-A5",
+      "actions": ["plan:One Bedroom (A5)"],
+      "contexts": ["1BR, 1BA - 704 SF", "One Bedroom (A5)"],
+      "sources": ["ApartmentHomeLiving Cyan/PDX syndicated tourImages"],
+      "validPublicModel": true
+    },
+    {
+      "modelSid": "YT1W3S4k8ah",
+      "label": "Townhome-AT2",
+      "actions": ["plan:Large One Bedroom Townhome (AT2)"],
+      "contexts": ["1BR, 1.5BA Townhome - 935 SF", "Townhome (AT2)"],
+      "sources": ["ApartmentHomeLiving Cyan/PDX syndicated tourImages"],
+      "validPublicModel": true
+    },
+    {
+      "modelSid": "rd64NfYqqTi",
+      "label": "Two-Bedroom-B1",
+      "actions": ["plan:Two Bedroom, One Bath (B1)"],
+      "contexts": ["2BR, 1BA - 746 SF", "Two Bedroom, One Bath (B1)"],
+      "sources": ["ApartmentHomeLiving Cyan/PDX syndicated tourImages"],
+      "validPublicModel": true
+    },
+    {
+      "modelSid": "P9kBAiTeDWn",
+      "label": "Two-Bedroom-B3",
+      "actions": ["plan:Two Bedroom, Two Bath (B3)"],
+      "contexts": ["2BR, 2BA - 873 SF", "Two Bedroom, Two Bath (B3)"],
+      "sources": ["ApartmentHomeLiving Cyan/PDX syndicated tourImages"],
+      "validPublicModel": true
+    },
+    {
+      "modelSid": "6Hv9LyTsdxw",
+      "label": "Three-Bedroom-C1",
+      "actions": ["plan:Three Bedroom (C1)"],
+      "contexts": ["3BR, 2BA - 1,066 SF", "Three Bedroom (C1)"],
+      "sources": ["ApartmentHomeLiving Cyan/PDX syndicated tourImages"],
+      "validPublicModel": true
+    }
+  ],
+  "validModels": [
+    {"modelSid": "i1MqSM99sWw"},
+    {"modelSid": "keZVKW8FS8u"},
+    {"modelSid": "tbsF2zv6xxs"},
+    {"modelSid": "YT1W3S4k8ah"},
+    {"modelSid": "rd64NfYqqTi"},
+    {"modelSid": "P9kBAiTeDWn"},
+    {"modelSid": "6Hv9LyTsdxw"}
+  ],
+  "validModelCount": 7
+}
