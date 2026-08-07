@@ -1,67 +1,81 @@
-name: Temporary Cyan PDX discovery PR trigger
+name: MP360 Cyan remaining public-reference tours
 
 on:
   pull_request:
     branches: [master]
     paths:
       - mp360-jina-relay.md
+      - mp360/**
       - .github/workflows/mp360-discover-pr-temp.yml
 
 permissions:
   contents: read
 
 jobs:
-  discover:
+  extract:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 240
     steps:
-      - name: Check out pull request
+      - name: Check out temporary branch
         uses: actions/checkout@v4
+        with:
+          ref: mp360-cyan-encrypted-20260807
 
-      - name: Install Playwright
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install extraction dependencies
         shell: bash
         run: |
           set -euxo pipefail
-          npm init -y >/dev/null
-          npm install --no-audit --no-fund playwright@1.60.0
-          npx playwright install --with-deps chromium
-          mkdir -p discovery
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg zip jq xvfb
+          python -m pip install --upgrade pip
+          python -m pip install playwright==1.60.0 pillow requests curl_cffi aiofiles tqdm
+          python -m playwright install --with-deps chromium
+          python -m py_compile mp360/crawl_cyan_tours.py mp360/convert_cyan_tours.py
+          ffmpeg -hide_banner -filters | grep -E '(^| )v360( |$)'
 
-      - name: Extract and run the committed discovery program
+      - name: Resolve and extract public panorama images
         shell: bash
-        run: |
-          set -euxo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          text = Path('.github/workflows/mp360-discover-temp.yml').read_text()
-          start_marker = "          cat > discover.mjs <<'NODE'\n"
-          end_marker = "\n          NODE\n"
-          start = text.index(start_marker) + len(start_marker)
-          end = text.index(end_marker, start)
-          lines = text[start:end].splitlines()
-          Path('discover.mjs').write_text('\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n')
-          PY
-          node --check discover.mjs
-          node discover.mjs 2>&1 | tee discovery/run.log
-          cat discovery/models.txt
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          data = json.loads(Path('discovery/models.json').read_text())
-          print(json.dumps({
-              'modelCount': data['modelCount'],
-              'models': [
-                  {'modelSid': item['modelSid'], 'actions': item['actions'][:8]}
-                  for item in data['models']
-              ],
-          }, indent=2))
-          PY
+        run: bash mp360/run_cyan_extraction.sh
 
-      - name: Upload discovery evidence
+      - name: Upload remaining-tour image ZIP
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cyan-pdx-matterport-discovery-${{ github.run_id }}
-          path: discovery
-          if-no-files-found: error
-          retention-days: 2
+          name: cyan-pdx-remaining-matterport-panoramas-${{ github.run_id }}
+          path: |
+            output/cyan-pdx-remaining-matterport-panoramas.zip
+            output/manifest.json
+            output/RUN_SUMMARY.md
+            output/BUNDLE_SHA256.txt
+            output/contact_sheets/**
+            output/discovery/**
+            output/logs/**
+            output/model-download-status.tsv
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 1
+
+      - name: Require all six remaining tours
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path('output/manifest.json').read_text())
+          print(json.dumps({
+              'remainingModelCount': manifest['remainingModelCount'],
+              'remainingPanoramaCount': manifest['remainingPanoramaCount'],
+              'models': manifest['models'],
+          }, indent=2))
+          if manifest['remainingModelCount'] < 6:
+              raise SystemExit(
+                  f"Expected six remaining tours; converted {manifest['remainingModelCount']}"
+              )
+          if manifest['remainingPanoramaCount'] < 6:
+              raise SystemExit('The remaining-tour image set is incomplete.')
+          PY
