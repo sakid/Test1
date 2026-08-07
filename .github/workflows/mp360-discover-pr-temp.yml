@@ -1,0 +1,67 @@
+name: Temporary Cyan PDX discovery PR trigger
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - mp360-jina-relay.md
+      - .github/workflows/mp360-discover-pr-temp.yml
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v4
+
+      - name: Install Playwright
+        shell: bash
+        run: |
+          set -euxo pipefail
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.60.0
+          npx playwright install --with-deps chromium
+          mkdir -p discovery
+
+      - name: Extract and run the committed discovery program
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('.github/workflows/mp360-discover-temp.yml').read_text()
+          start_marker = "          cat > discover.mjs <<'NODE'\n"
+          end_marker = "\n          NODE\n"
+          start = text.index(start_marker) + len(start_marker)
+          end = text.index(end_marker, start)
+          lines = text[start:end].splitlines()
+          Path('discover.mjs').write_text('\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n')
+          PY
+          node --check discover.mjs
+          node discover.mjs 2>&1 | tee discovery/run.log
+          cat discovery/models.txt
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('discovery/models.json').read_text())
+          print(json.dumps({
+              'modelCount': data['modelCount'],
+              'models': [
+                  {'modelSid': item['modelSid'], 'actions': item['actions'][:8]}
+                  for item in data['models']
+              ],
+          }, indent=2))
+          PY
+
+      - name: Upload discovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyan-pdx-matterport-discovery-${{ github.run_id }}
+          path: discovery
+          if-no-files-found: error
+          retention-days: 2
