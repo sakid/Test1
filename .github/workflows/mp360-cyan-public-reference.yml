@@ -1,0 +1,83 @@
+name: MP360 Cyan remaining public-reference tours
+
+on:
+  push:
+    branches:
+      - mp360-cyan-encrypted-20260807
+    paths:
+      - mp360/**
+      - .github/workflows/mp360-cyan-public-reference.yml
+      - .github/mp360-trigger.txt
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Check out temporary branch
+        uses: actions/checkout@v4
+        with:
+          ref: mp360-cyan-encrypted-20260807
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install extraction dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg zip jq xvfb
+          python -m pip install --upgrade pip
+          python -m pip install playwright==1.60.0 pillow requests curl_cffi aiofiles tqdm
+          python -m playwright install --with-deps chromium
+          python -m py_compile mp360/crawl_cyan_tours.py mp360/convert_cyan_tours.py
+          ffmpeg -hide_banner -filters | grep -E '(^| )v360( |$)'
+
+      - name: Resolve and extract public panorama images
+        shell: bash
+        run: bash mp360/run_cyan_extraction.sh
+
+      - name: Upload remaining-tour image ZIP
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyan-pdx-remaining-matterport-panoramas-${{ github.run_id }}
+          path: |
+            output/cyan-pdx-remaining-matterport-panoramas.zip
+            output/manifest.json
+            output/RUN_SUMMARY.md
+            output/BUNDLE_SHA256.txt
+            output/contact_sheets/**
+            output/discovery/**
+            output/logs/**
+            output/model-download-status.tsv
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 1
+
+      - name: Require all six remaining tours
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path('output/manifest.json').read_text())
+          print(json.dumps({
+              'remainingModelCount': manifest['remainingModelCount'],
+              'remainingPanoramaCount': manifest['remainingPanoramaCount'],
+              'models': manifest['models'],
+          }, indent=2))
+          if manifest['remainingModelCount'] < 6:
+              raise SystemExit(
+                  f"Expected six remaining tours; converted {manifest['remainingModelCount']}"
+              )
+          if manifest['remainingPanoramaCount'] < 6:
+              raise SystemExit('The remaining-tour image set is incomplete.')
+          PY
