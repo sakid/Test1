@@ -1,4 +1,4 @@
-name: MP360 Cyan remaining public-reference tours
+name: MP360 Cyan C1 rate-limited panorama retry
 
 on:
   pull_request:
@@ -12,9 +12,9 @@ permissions:
   contents: read
 
 jobs:
-  extract:
+  extract-c1:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 180
     steps:
       - name: Check out temporary branch
         uses: actions/checkout@v4
@@ -26,27 +26,26 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install extraction dependencies
+      - name: Install image dependencies
         shell: bash
         run: |
           set -euxo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg zip jq xvfb
+          sudo apt-get install -y -qq ffmpeg zip jq
           python -m pip install --upgrade pip
-          python -m pip install playwright==1.60.0 pillow requests curl_cffi aiofiles tqdm
-          python -m playwright install --with-deps chromium
-          python -m py_compile mp360/crawl_cyan_tours.py mp360/convert_cyan_tours.py
+          python -m pip install pillow requests curl_cffi aiofiles tqdm
+          python -m py_compile mp360/convert_cyan_tours.py
           ffmpeg -hide_banner -filters | grep -E '(^| )v360( |$)'
 
-      - name: Resolve and extract public panorama images
+      - name: Download and convert C1 at low concurrency
         shell: bash
-        run: bash mp360/run_cyan_extraction.sh
+        run: bash mp360/run_c1_retry.sh
 
-      - name: Upload remaining-tour image ZIP
+      - name: Upload C1 panorama ZIP
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cyan-pdx-remaining-matterport-panoramas-${{ github.run_id }}
+          name: cyan-pdx-c1-panoramas-${{ github.run_id }}
           path: |
             output/cyan-pdx-remaining-matterport-panoramas.zip
             output/manifest.json
@@ -60,22 +59,19 @@ jobs:
           compression-level: 0
           retention-days: 1
 
-      - name: Require all six remaining tours
+      - name: Require complete C1 model
         shell: bash
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           manifest = json.loads(Path('output/manifest.json').read_text())
-          print(json.dumps({
-              'remainingModelCount': manifest['remainingModelCount'],
-              'remainingPanoramaCount': manifest['remainingPanoramaCount'],
-              'models': manifest['models'],
-          }, indent=2))
-          if manifest['remainingModelCount'] < 6:
+          if manifest['remainingModelCount'] != 1:
               raise SystemExit(
-                  f"Expected six remaining tours; converted {manifest['remainingModelCount']}"
+                  f"Expected one C1 model; got {manifest['remainingModelCount']}"
               )
-          if manifest['remainingPanoramaCount'] < 6:
-              raise SystemExit('The remaining-tour image set is incomplete.')
+          if manifest['remainingPanoramaCount'] < 23:
+              raise SystemExit(
+                  f"Expected 23 C1 panoramas; got {manifest['remainingPanoramaCount']}"
+              )
           PY
