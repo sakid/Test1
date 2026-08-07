@@ -1,11 +1,11 @@
-name: Temporary Cyan PDX tour-data HTTP probe
+name: Temporary Cyan PDX syndicated tour-data probe
 
 on:
   pull_request:
     branches: [master]
     paths:
       - mp360-jina-relay.md
-      - mp360-http-probe.py
+      - mp360-syndication-probe.py
       - .github/workflows/mp360-discover-pr-temp.yml
 
 permissions:
@@ -14,45 +14,45 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Check out temporary discovery branch
         uses: actions/checkout@v4
         with:
           ref: mp360-cyan-id-discovery-20260807
 
-      - name: Probe server HTML and listing bundles
+      - name: Probe syndicated listing HTML and JavaScript bundles
         shell: bash
         run: |
           set -euxo pipefail
           python -m pip install --upgrade pip
           python -m pip install requests curl_cffi
-          rm -rf discovery/http-probe
-          python mp360-http-probe.py 2>&1 | tee discovery/http-probe-run.log
-          cat discovery/http-probe/summary.json
+          rm -rf discovery/syndication-probe
+          python mp360-syndication-probe.py 2>&1 | tee discovery/syndication-probe-run.log
+          cat discovery/syndication-probe/summary.json
 
-      - name: Commit HTTP-probe evidence to temporary branch
+      - name: Commit probe evidence to temporary branch
         if: always()
         shell: bash
         run: |
           set -euxo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f discovery/http-probe discovery/http-probe-run.log || true
+          git add -f discovery/syndication-probe discovery/syndication-probe-run.log || true
           if git diff --cached --quiet; then
-            echo "No HTTP probe files to commit."
+            echo "No syndicated probe files to commit."
           else
-            git commit -m "Save Cyan tour-data HTTP probe"
+            git commit -m "Save Cyan syndicated tour-data probe"
             git push origin HEAD:mp360-cyan-id-discovery-20260807
           fi
 
-      - name: Upload HTTP-probe evidence
+      - name: Upload probe evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cyan-pdx-tour-data-http-probe-${{ github.run_id }}
+          name: cyan-pdx-syndicated-tour-data-${{ github.run_id }}
           path: |
-            discovery/http-probe/**
-            discovery/http-probe-run.log
+            discovery/syndication-probe/**
+            discovery/syndication-probe-run.log
           if-no-files-found: warn
           retention-days: 1
